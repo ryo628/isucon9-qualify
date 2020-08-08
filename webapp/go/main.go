@@ -962,13 +962,14 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	sellers, err := getUserSimpleByItems(tx, items)
 	itemDetails := []ItemDetail{}
 	for _, item := range items {
-		seller, err := getUserSimpleByID(tx, item.SellerID)
-		if err != nil {
-			outputErrorMsg(w, http.StatusNotFound, "seller not found")
-			tx.Rollback()
-			return
+		seller := UserSimple{}
+		for _, v := range sellers {
+			if item.SellerID == v.ID {
+				seller = v
+			}
 		}
 		category, err := getCategoryByID(tx, item.CategoryID)
 		if err != nil {
