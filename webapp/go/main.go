@@ -424,6 +424,21 @@ func getUserSimpleByID(q sqlx.Queryer, userID int64) (userSimple UserSimple, err
 	return userSimple, err
 }
 
+func getUserSimpleByItems(q sqlx.Queryer, items []Item) (userSimples []UserSimple, err error) {
+	var sellerIDs []int64
+	for _, v := range items {
+		sellerIDs = append(sellerIDs, v.SellerID)
+	}
+	sql, params, err := sqlx.In("SELECT id, account_name, num_sell_items FROM `users` WHERE `id` IN (?)", sellerIDs)
+
+	user := []UserSimple{}
+	err = sqlx.Select(q, &user, sql, params...)
+	if err != nil {
+		return userSimples, err
+	}
+	return user, err
+}
+
 func getCategoryByID(q sqlx.Queryer, categoryID int) (category Category, err error) {
 	for _, cat := range categoryList {
 		if cat.ID == categoryID {
@@ -598,12 +613,14 @@ func getNewItems(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	sellers, err := getUserSimpleByItems(dbx, items)
 	itemSimples := []ItemSimple{}
 	for _, item := range items {
-		seller, err := getUserSimpleByID(dbx, item.SellerID)
-		if err != nil {
-			outputErrorMsg(w, http.StatusNotFound, "seller not found")
-			return
+		seller := UserSimple{}
+		for _, v := range sellers {
+			if item.SellerID == v.ID {
+				seller = v
+			}
 		}
 		category, err := getCategoryByID(dbx, item.CategoryID)
 		if err != nil {
@@ -726,12 +743,14 @@ func getNewCategoryItems(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	sellers, err := getUserSimpleByItems(dbx, items)
 	itemSimples := []ItemSimple{}
 	for _, item := range items {
-		seller, err := getUserSimpleByID(dbx, item.SellerID)
-		if err != nil {
-			outputErrorMsg(w, http.StatusNotFound, "seller not found")
-			return
+		seller := UserSimple{}
+		for _, v := range sellers {
+			if item.SellerID == v.ID {
+				seller = v
+			}
 		}
 		category, err := getCategoryByID(dbx, item.CategoryID)
 		if err != nil {
@@ -953,13 +972,14 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	sellers, err := getUserSimpleByItems(tx, items)
 	itemDetails := []ItemDetail{}
 	for _, item := range items {
-		seller, err := getUserSimpleByID(tx, item.SellerID)
-		if err != nil {
-			outputErrorMsg(w, http.StatusNotFound, "seller not found")
-			tx.Rollback()
-			return
+		seller := UserSimple{}
+		for _, v := range sellers {
+			if item.SellerID == v.ID {
+				seller = v
+			}
 		}
 		category, err := getCategoryByID(tx, item.CategoryID)
 		if err != nil {
