@@ -69,6 +69,9 @@ var (
 	categoryList []Category
 	// Query のcache
 	selectUserByIdStmt *sqlx.Stmt
+	selectUserElementByIdStmt *sqlx.Stmt
+	selectUserByIdForUpdateStmt *sqlx.Stmt
+	selectUserByAccountNameStmt *sqlx.Stmt
 )
 
 type Config struct {
@@ -324,10 +327,22 @@ func main() {
 		log.Fatalf("failed to connect to DB: %s.", err.Error())
 	}
 	defer dbx.Close()
-	selectUserByIdStmt, err = dbx.Preparex("SELECT id, account_name, num_sell_items FROM `users` WHERE `id` = ?")
+	selectUserByIdStmt, err = dbx.Preparex("SELECT * FROM `users` WHERE `id` = ?")
 	if err != nil {
 		log.Fatalf("Prepare failed.", selectUserByIdStmt)
 	}
+	selectUserElementByIdStmt, err = dbx.Preparex("SELECT id, account_name, num_sell_items FROM `users` WHERE `id` = ?")
+	if err != nil {
+		log.Fatalf("Prepare failed.", selectUserByIdStmt)
+	}
+	selectUserByIdForUpdateStmt, err = dbx.Preparex("SELECT * FROM `users` WHERE `id` = ? FOR UPDATE")
+	if err != nil {
+		log.Fatalf("Prepare failed.", selectUserByIdForUpdateStmt)
+	}
+	selectUserByAccountNameStmt, err = dbx.Preparex("SELECT * FROM `users` WHERE `account_name` = ?")
+	if err != nil {
+		log.Fatalf("Prepare failed.", selectUserByAccountNameStmt)
+	}	
 
 	mux := goji.NewMux()
 
@@ -400,7 +415,7 @@ func getUser(r *http.Request) (user User, errCode int, errMsg string) {
 		return user, http.StatusNotFound, "no session"
 	}
 
-	err := dbx.Get(&user, "SELECT * FROM `users` WHERE `id` = ?", userID)
+	err := selectUserByIdStmt.Get(&user, userID)
 	if err == sql.ErrNoRows {
 		return user, http.StatusNotFound, "user not found"
 	}
@@ -414,7 +429,7 @@ func getUser(r *http.Request) (user User, errCode int, errMsg string) {
 
 func getUserSimpleByID(q sqlx.Queryer, userID int64) (userSimple UserSimple, err error) {
 	user := UserSimple{}
-	err = selectUserByIdStmt.Get(&user, userID)
+	err = selectUserElementByIdStmt.Get(&user, userID)
 	if err != nil {
 		return userSimple, err
 	}
@@ -1357,7 +1372,7 @@ func postBuy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	seller := User{}
-	err = tx.Get(&seller, "SELECT * FROM `users` WHERE `id` = ? FOR UPDATE", targetItem.SellerID)
+	err = selectUserByIdForUpdateStmt.Get(&seller, targetItem.SellerID)
 	if err == sql.ErrNoRows {
 		outputErrorMsg(w, http.StatusNotFound, "seller not found")
 		tx.Rollback()
@@ -2011,7 +2026,7 @@ func postSell(w http.ResponseWriter, r *http.Request) {
 	tx := dbx.MustBegin()
 
 	seller := User{}
-	err = tx.Get(&seller, "SELECT * FROM `users` WHERE `id` = ? FOR UPDATE", user.ID)
+	err = selectUserByIdForUpdateStmt.Get(&seller, user.ID)
 	if err == sql.ErrNoRows {
 		outputErrorMsg(w, http.StatusNotFound, "user not found")
 		tx.Rollback()
@@ -2119,7 +2134,7 @@ func postBump(w http.ResponseWriter, r *http.Request) {
 	}
 
 	seller := User{}
-	err = tx.Get(&seller, "SELECT * FROM `users` WHERE `id` = ? FOR UPDATE", user.ID)
+	err = selectUserByIdForUpdateStmt.Get(&seller, user.ID)
 	if err == sql.ErrNoRows {
 		outputErrorMsg(w, http.StatusNotFound, "user not found")
 		tx.Rollback()
@@ -2225,7 +2240,7 @@ func postLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	u := User{}
-	err = dbx.Get(&u, "SELECT * FROM `users` WHERE `account_name` = ?", accountName)
+	err = selectUserByAccountNameStmt.Get(&u, accountName)
 	if err == sql.ErrNoRows {
 		outputErrorMsg(w, http.StatusUnauthorized, "アカウント名かパスワードが間違えています")
 		return
