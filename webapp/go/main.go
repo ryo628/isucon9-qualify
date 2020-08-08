@@ -418,6 +418,21 @@ func getUserSimpleByID(q sqlx.Queryer, userID int64) (userSimple UserSimple, err
 	return userSimple, err
 }
 
+func getUserSimpleByItems(q sqlx.Queryer, items []Item) (userSimples []UserSimple, err error) {
+	var sellerIDs []int64
+	for _, v := range items {
+		sellerIDs = append(sellerIDs, v.SellerID)
+	}
+	sql, params, err := sqlx.In("SELECT id, account_name, num_sell_items FROM `users` WHERE `id` IN (?)", sellerIDs)
+
+	user := []UserSimple{}
+	err = sqlx.Select(q, &user, sql, params...)
+	if err != nil {
+		return userSimples, err
+	}
+	return user, err
+}
+
 func getCategoryByID(q sqlx.Queryer, categoryID int) (category Category, err error) {
 	for _, cat := range categoryList {
 		if cat.ID == categoryID {
