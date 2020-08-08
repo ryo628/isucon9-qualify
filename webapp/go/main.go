@@ -67,6 +67,8 @@ var (
 	store     sessions.Store
 	// カテゴリメモ化
 	categoryList []Category
+	// Query のcache
+	selectUserByIdStmt *sqlx.Stmt
 )
 
 type Config struct {
@@ -322,6 +324,10 @@ func main() {
 		log.Fatalf("failed to connect to DB: %s.", err.Error())
 	}
 	defer dbx.Close()
+	selectUserByIdStmt, err = dbx.Preparex("SELECT id, account_name, num_sell_items FROM `users` WHERE `id` = ?")
+	if err != nil {
+		log.Fatalf("Prepare failed.", selectUserByIdStmt)
+	}
 
 	mux := goji.NewMux()
 
@@ -408,7 +414,7 @@ func getUser(r *http.Request) (user User, errCode int, errMsg string) {
 
 func getUserSimpleByID(q sqlx.Queryer, userID int64) (userSimple UserSimple, err error) {
 	user := UserSimple{}
-	err = sqlx.Get(q, &user, "SELECT id, account_name, num_sell_items FROM `users` WHERE `id` = ?", userID)
+	err = selectUserByIdStmt.Get(&user, userID)
 	if err != nil {
 		return userSimple, err
 	}
