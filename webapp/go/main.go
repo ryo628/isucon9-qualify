@@ -410,17 +410,19 @@ func getUserSimpleByID(q sqlx.Queryer, userID int64) (userSimple UserSimple, err
 }
 
 func getCategoryByID(q sqlx.Queryer, categoryID int) (category Category, err error) {
-	for i, cat := range categoryList {
+	var c Category
+	for _, cat := range categoryList {
 		if cat.ID == categoryID {
 			log.Print("%v\n", cat)
+			c = cat
 			return cat, nil
 		}
 	}
-	return nil, nil
+	return c, nil
 }
 
 func getParentName(id int) string {
-	var index := 0
+	index := 0
 	for i, cat := range categoryList {
 		if cat.ID == id {
 			index = i
@@ -431,6 +433,13 @@ func getParentName(id int) string {
 	if pid := categoryList[index].ParentID; pid != 0 {
 		return getParentName(pid)
 	} else {
+		index = 0
+		for i, cat := range categoryList {
+			if cat.ID == id {
+				index = i
+			}
+		}
+		
 		return categoryList[index].CategoryName
 	}
 }
@@ -520,8 +529,11 @@ func postInitialize(w http.ResponseWriter, r *http.Request) {
 		log.Print(err)
 	}
 	log.Print("%v\n", categoryList)
-	for _, cat := range categoryList {
-		cat.ParentCategoryName = getParentName(cat.ID)
+	for i, cat := range categoryList {
+		if cat.ParentID != 0 {
+			categoryList[i].ParentCategoryName = getParentName(cat.ID)
+			log.Println("%v\n", categoryList[i].ParentCategoryName)
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json;charset=utf-8")
