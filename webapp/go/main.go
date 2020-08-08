@@ -607,12 +607,14 @@ func getNewItems(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	sellers, err := getUserSimpleByItems(dbx, items)
 	itemSimples := []ItemSimple{}
 	for _, item := range items {
-		seller, err := getUserSimpleByID(dbx, item.SellerID)
-		if err != nil {
-			outputErrorMsg(w, http.StatusNotFound, "seller not found")
-			return
+		seller := UserSimple{}
+		for _, v := range sellers {
+			if item.SellerID == v.ID {
+				seller = v
+			}
 		}
 		category, err := getCategoryByID(dbx, item.CategoryID)
 		if err != nil {
